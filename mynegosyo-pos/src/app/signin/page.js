@@ -42,7 +42,7 @@ export default function SignIn() {
           id="email"
           type="email"
           placeholder="you@email.com"
-          className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+          className="w-full p-3 mb-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 transition text-gray-700"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -55,7 +55,7 @@ export default function SignIn() {
           id="password"
           type="password"
           placeholder="Your password"
-          className="w-full p-3 mb-6 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+          className="w-full p-3 mb-6 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 transition text-gray-700"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -63,7 +63,7 @@ export default function SignIn() {
         />
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-3 rounded font-semibold hover:bg-blue-700 transition shadow"
+          className="w-full bg-blue-600 text-white py-3 rounded font-semibold hover:bg-blue-700 transition shadow cursor-pointer"
         >
           Sign In
         </button>

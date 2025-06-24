@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '../../firebase';
 import {
+  collection,
+  getDocs,
   doc,
   setDoc,
   getDoc,
   updateDoc,
   arrayUnion,
+  query,
 } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
 
@@ -21,7 +24,36 @@ export default function Dashboard() {
   const [storePassword, setStorePassword] = useState('');
   const [joinName, setJoinName] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
+  const [myStores, setMyStores] = useState([]);
 
+  // Fetch user's stores
+  useEffect(() => {
+    if (!loading && user) {
+      const fetchStores = async () => {
+        const q = query(collection(db, 'stores'));
+        const querySnapshot = await getDocs(q);
+        const userStores = [];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const match = data.members.find((m) => m.userId === user.uid);
+          if (match) {
+            userStores.push({
+              id: doc.id,
+              name: data.name,
+              role: match.role,
+            });
+          }
+        });
+
+        setMyStores(userStores);
+      };
+
+      fetchStores();
+    }
+  }, [loading, user]);
+
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       router.push('/signin');
@@ -29,11 +61,11 @@ export default function Dashboard() {
   }, [user, loading]);
 
   const handleCreateStore = async () => {
-    if (!storeName || !storePassword) return alert('Fill in all fields');
+    if (!storeName || !storePassword) return alert('Please fill in all fields.');
 
     const storeRef = doc(db, 'stores', storeName);
     const storeSnap = await getDoc(storeRef);
-    if (storeSnap.exists()) return alert('Store name already exists');
+    if (storeSnap.exists()) return alert('Store name already exists.');
 
     const hashedPassword = await bcrypt.hash(storePassword, 10);
 
@@ -56,22 +88,21 @@ export default function Dashboard() {
   };
 
   const handleJoinStore = async () => {
-    if (!joinName || !joinPassword) return alert('Fill in all fields');
+    if (!joinName || !joinPassword) return alert('Please fill in all fields.');
 
     const storeRef = doc(db, 'stores', joinName);
     const storeSnap = await getDoc(storeRef);
 
-    if (!storeSnap.exists()) return alert('Store not found');
+    if (!storeSnap.exists()) return alert('Store not found.');
 
     const storeData = storeSnap.data();
     const isValid = await bcrypt.compare(joinPassword, storeData.password);
-
-    if (!isValid) return alert('Incorrect password');
+    if (!isValid) return alert('Incorrect password.');
 
     const member = {
       userId: user.uid,
       email: user.email,
-      role: 'pending', // will need approval
+      role: 'pending',
     };
 
     await updateDoc(storeRef, {
@@ -83,67 +114,115 @@ export default function Dashboard() {
     setJoinPassword('');
   };
 
-  if (loading || !user) return <p className="text-center mt-10">Loading...</p>;
+  const confirmLogout = () => {
+    if (confirm('Are you sure you want to log out?')) {
+      logout();
+    }
+  };
+
+  if (loading || !user) return <p className="text-center mt-10 text-gray-700">Loading...</p>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-3xl mx-auto bg-white p-6 rounded shadow">
-        <h1 className="text-xl font-bold mb-4">Welcome, {user.email}</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 py-12 px-4">
+      <div className="w-full max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl p-10 border border-gray-200">
+        <h1 className="text-3xl font-bold text-blue-800 mb-4 text-center">📊 Dashboard</h1>
+        <h2 className="text-xl text-gray-700 text-center mb-10">
+          Welcome, <span className="font-semibold text-gray-900">{user.email}</span>
+        </h2>
 
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-2">📦 Create a Store</h2>
-          <input
-            type="text"
-            placeholder="Store name"
-            className="w-full p-2 border mb-2 rounded"
-            value={storeName}
-            onChange={(e) => setStoreName(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Store password"
-            className="w-full p-2 border mb-2 rounded"
-            value={storePassword}
-            onChange={(e) => setStorePassword(e.target.value)}
-          />
-          <button
-            onClick={handleCreateStore}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Create Store
-          </button>
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Create Store */}
+          <div className="bg-blue-50 rounded-2xl p-6 shadow border border-blue-100 flex flex-col">
+            <h2 className="text-lg font-semibold mb-4 text-gray-700">📦 Create a Store</h2>
+            <input
+              type="text"
+              placeholder="Store name"
+              className="w-full p-3 mb-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Store password"
+              className="w-full p-3 mb-5 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+              value={storePassword}
+              onChange={(e) => setStorePassword(e.target.value)}
+            />
+            <button
+              onClick={handleCreateStore}
+              className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow"
+            >
+              Create Store
+            </button>
+          </div>
+
+          {/* Join Store */}
+          <div className="bg-green-50 rounded-2xl p-6 shadow border border-green-100 flex flex-col">
+            <h2 className="text-lg font-semibold mb-4 text-gray-700">➕ Join a Store</h2>
+            <input
+              type="text"
+              placeholder="Store name"
+              className="w-full p-3 mb-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Store password"
+              className="w-full p-3 mb-5 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+              value={joinPassword}
+              onChange={(e) => setJoinPassword(e.target.value)}
+            />
+            <button
+              onClick={handleJoinStore}
+              className="bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition shadow"
+            >
+              Request to Join
+            </button>
+          </div>
         </div>
 
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-2">➕ Join a Store</h2>
-          <input
-            type="text"
-            placeholder="Store name"
-            className="w-full p-2 border mb-2 rounded"
-            value={joinName}
-            onChange={(e) => setJoinName(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Store password"
-            className="w-full p-2 border mb-2 rounded"
-            value={joinPassword}
-            onChange={(e) => setJoinPassword(e.target.value)}
-          />
-          <button
-            onClick={handleJoinStore}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            Request to Join
-          </button>
+        {/* My Stores */}
+        <div className="mt-12">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">🏬 My Stores</h2>
+          {myStores.length === 0 ? (
+            <p className="text-sm text-gray-500">You are not part of any store yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {myStores.map((store) => (
+                <li
+                  key={store.id}
+                  className="bg-white border p-4 rounded-lg shadow-sm flex justify-between items-center"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-800">{store.name}</p>
+                    <p className="text-sm text-gray-500">Role: {store.role}</p>
+                  </div>
+                  {store.role !== 'pending' ? (
+                    <a
+                      href={`/store/${store.id}`}
+                      className="text-blue-600 underline text-sm hover:text-blue-800"
+                    >
+                      Open
+                    </a>
+                  ) : (
+                    <span className="text-yellow-600 text-sm italic">Pending approval</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        <button
-          onClick={logout}
-          className="text-red-600 underline hover:text-red-800"
-        >
-          Logout
-        </button>
+        {/* Logout */}
+        <div className="mt-12 text-center">
+          <button
+            onClick={confirmLogout}
+            className="text-red-600 underline font-medium hover:text-red-800 transition"
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
